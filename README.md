@@ -1,41 +1,63 @@
+# WebRTC · analisador de respostas STUN
 
+Ferramenta de diagnóstico para verificar quais endereços de saída um servidor STUN informa a um cliente sob teste. Funciona com captura local via TShark e replay de PCAP sem interface gráfica. Cada observação contém a transação STUN, o endereço mapeado, a porta e a comparação com as saídas previstas pelo operador.
 
-# WebRTC STUN IP Analyzer 🕵️‍♂️🌐
+## Executar
 
-A network traffic analyzer with a Graphical User Interface (GUI) built in Python to demonstrate and monitor the leakage of public IP addresses via WebRTC using the STUN protocol.
+Use Python 3.11 ou superior e TShark 4.x. A interface gráfica também requer Tk. No Ubuntu, os pacotes de sistema são `tshark` e `python3-tk`. No Windows, instale Wireshark com TShark e Npcap. O aplicativo procura TShark no PATH e, no Windows, também no diretório padrão do Wireshark. O runtime Python usa apenas a biblioteca padrão.
 
-This tool acts as a Proof of Concept (PoC) to illustrate how WebRTC can expose a user's true location and IP address during Peer-to-Peer (P2P) connection negotiation, even when certain proxy configurations or improperly configured VPNs are in use.
+```sh
+tshark --version
+tshark -D
+python STUN.py
+```
 
-<br>
+Escolha o índice da interface e o IP local que recebe as respostas. Em uma captura dentro do túnel, esse IP pode pertencer à interface virtual. Informe os IPs de saída previstos pela política ou deixe o campo vazio para inventário. A política fica fixa durante a sessão. Use as permissões de captura da plataforma para o usuário da sessão. O replay funciona sem privilégios de captura.
 
-<div align="center">
-  <img src="assets/webrtcscreen.png" alt="Interface do WebRTC Analyzer" width="700">
-</div>
+A consulta opcional ao ipify preenche o campo de referência com **uma** saída HTTPS. Verifique esse valor contra a política antes de iniciar. Selecionar uma linha e acionar a consulta ao ipinfo.io envia aquele IP ao provedor para obter localização aproximada e organização. Uma sessão padrão faz zero consultas HTTP.
 
-## 🚀 Features
+## Reproduzir uma análise
 
-* **Real-Time Capture:** Intercepts live UDP network packets focusing on the STUN protocol.
-* **Precision Filtering (TShark):** Isolates *Binding Response* (`0x0101`) messages containing the *XOR-MAPPED-ADDRESS* attribute (`0x0020`), which is exactly where the real IP is exposed.
-* **Automated Geolocation:** Queries the `ip-api.com` API to map captured IPs, returning City, Country, and Internet Service Provider (ISP). Includes a local caching system to prevent API rate-limiting.
-* **Self-IP Exclusion:** Features a built-in tool to fetch your current public IP and exclude it from the capture logic, focusing the analysis solely on remote peers.
-* **Graphical Interface (Tkinter):** A clean, dark-themed dashboard for easy configuration, visualization, and log monitoring.
+```sh
+python -m tests.fixture controlled.pcap
+python -m analyzer.replay controlled.pcap --local 192.0.2.10 --expected 198.51.100.7
+```
 
-## 🛠️ Prerequisites
+Saída esperada, na ordem do arquivo:
 
-To run this project, you must have the following installed on your machine:
+```text
+000102030405060708090a0c 198.51.100.7 3478 saída prevista
+000102030405060708090a0b 203.0.113.9 3478 divergência de saída (investigar)
+```
 
-1. **Python 3.x**
-2. **Wireshark / TShark:** The script uses `tshark.exe` under the hood for packet capturing.
-   * *Note:* By default, the script looks for the executable at `C:\Program Files\Wireshark\tshark.exe` (Standard Windows path).
+Os endereços são reservados para documentação. O PCAP contém cinco datagramas. A seleção do cliente exclui a resposta a outro destino. O parser descarta a resposta truncada e o UDP sem STUN.
 
-## 🧠 Under the Hood
+## Interpretar uma observação
 
-The script utilizes Python's subprocess module to spawn a parallel TShark process with the following display filter:
+| Resultado | Evidência |
+|---|---|
+| Observado, sem referência | O servidor informou um mapeamento. Falta a política de saída para compará-lo. |
+| Saída prevista | O IP mapeado consta na lista da sessão. A conclusão vale para essa resposta. |
+| Divergência de saída | O IP ficou fora da lista. Investigue interface, família IP, rotas, atribuição ao aplicativo e política de split tunnel. |
+| Nenhuma linha | A captura não encontrou uma resposta compatível. TURN, transporte cifrado, ausência de tráfego ou interface incorreta são possíveis explicações. |
 
-      stun.type == 0x0101 && stun.att.type == 0x0020
+Para confirmar vazamento, estabeleça qual destinatário ficou sabendo de qual IP e qual política proibia essa divulgação. Uma resposta STUN isolada não prova que um site recebeu um candidato ICE, que houve conexão com um peer ou que um navegador específico originou o tráfego.
 
-TShark's stdout is read asynchronously using threading, ensuring the Tkinter GUI remains responsive and does not freeze. Each captured IP is validated via Regular Expressions, counted, and passed to a geolocation function.
+## Verificar o projeto
 
-# ⚠️ Legal Disclaimer
+```sh
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+ruff check .
+ruff format --check .
+bandit -q -r analyzer STUN.py
+tshark --version
+python -m unittest discover -v
+```
 
-This project was developed strictly for educational and information security research purposes. Network traffic interception should only be performed on networks you own, administer, or have explicit permission to audit. The author is not responsible for any misuse of this tool.
+No PowerShell, ative o ambiente com `.venv\Scripts\Activate.ps1`. O teste de PCAP indica skip quando falta TShark. A CI exige o executável, roda a suíte em Python 3.11 e 3.13 e abre e fecha a GUI em um display virtual Linux.
+
+[Arquitetura e ameaças](docs/design.md) · [Cenários e evidências](docs/validation.md)
+
+A CI também captura respostas STUN reais entre namespaces Linux isolados, antes e depois de aplicar SNAT. O roteiro e as três expectativas estão em [Validação](docs/validation.md).
