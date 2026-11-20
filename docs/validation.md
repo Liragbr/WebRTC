@@ -30,3 +30,19 @@ Arquive política, comandos, hashes dos PCAPs e evidência do destinatário. Inf
 - [RFC 5769, vetores STUN](https://www.rfc-editor.org/rfc/rfc5769.html#section-2.3)
 - [RFC 8445, ICE](https://www.rfc-editor.org/rfc/rfc8445.html)
 - [Manual do TShark](https://www.wireshark.org/docs/man-pages/tshark.html)
+
+## Laboratório de rede executável em Linux
+
+A CI cria três namespaces sem rota para a internet. O cliente gera Binding requests, o roteador encaminha o UDP e o servidor constrói XOR-MAPPED-ADDRESS a partir do endereço e porta retornados por recvfrom. O cliente observa as respostas na interface lab0 usando o caminho de captura ao vivo da aplicação.
+
+| Configuração no roteador | Endereço observado pelo servidor | Política esperada | Resultado exigido |
+|---|---|---|---|
+| Roteamento direto | 192.0.2.10 | 192.0.2.10 | prevista |
+| SNAT ativo | 198.51.100.1 | 198.51.100.1 | prevista |
+| Mesmo SNAT | 198.51.100.1 | 192.0.2.10 | divergência |
+
+Em uma VM Linux descartável com iproute2, iptables, TShark e Python, execute `sudo bash tests/network/lab.sh "$(command -v python3)"`. O script remove os namespaces ao sair. Os privilégios são necessários para configurar o laboratório. Navegador, VPN comercial e sinalização ICE ficam fora deste ensaio.
+
+## Registro do replay
+
+O PCAP gerado por `python -m tests.fixture controlled.pcap` tem SHA-256 `8e9fc3a4613e38eec612da1847acbe34fcae99a5684302df69870261e2e54723`. Com Python 3.12.14 e TShark 4.4.18, a suíte local executou 13 testes sem skips. As duas linhas de stdout do replay estão transcritas no README.

@@ -59,3 +59,5 @@ python -m unittest discover -v
 No PowerShell, ative o ambiente com `.venv\Scripts\Activate.ps1`. O teste de PCAP indica skip quando falta TShark. A CI exige o executável, roda a suíte em Python 3.11 e 3.13 e abre e fecha a GUI em um display virtual Linux.
 
 [Arquitetura e ameaças](docs/design.md) · [Cenários e evidências](docs/validation.md)
+
+A CI também captura respostas STUN reais entre namespaces Linux isolados, antes e depois de aplicar SNAT. O roteiro e as três expectativas estão em [Validação](docs/validation.md).

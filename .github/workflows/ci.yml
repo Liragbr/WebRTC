@@ -34,3 +34,5 @@ jobs:
         run: python -m unittest discover -v
       - name: Open and close the GUI
         run: xvfb-run -a python -c 'import tkinter as tk; from analyzer.gui import Analyzer; r=tk.Tk(); app=Analyzer(r); r.after(150,app.close); r.mainloop()'
+      - name: Capture on isolated routed and SNAT networks
+        run: sudo bash tests/network/lab.sh "$(command -v python)"
